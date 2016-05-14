@@ -76,13 +76,14 @@ var WinMode = {
       top: 0,
       right: 0,
       style: {
-        fg: 'white',
         bg: 'default',
         border: {
           fg: 'cyan',
           bold : true
         },
         selected: {
+          bg : 'blue',
+          fg : 'white'
         }
       }
     });
@@ -97,10 +98,10 @@ var WinMode = {
       else if (key.name == 'up' && position > 0)
         list.select(--position);
 
-      var hostname = list.value;
-      if (!hostname) return;
-      current_server = hostname;
-      textbox.setItems(that._stream_buffer[hostname].output);
+      var ip = list.value;
+      if (!ip) return;
+      current_server = ip;
+      textbox.setItems(that._stream_buffer[ip].output);
       screen.render();
     });
 
@@ -112,12 +113,12 @@ var WinMode = {
       server_list.forEach(function(server) {
         var server_str = '';
 
-        if (that._stream_buffer[server.hostname].error)
-          server_str = chalk.bold.red(server.hostname);
-        else if (that._stream_buffer[server.hostname].finished)
-          server_str = chalk.bold.green(server.hostname);
+        if (that._stream_buffer[server.ip].error)
+          server_str = chalk.bold.red(server.ip);
+        else if (that._stream_buffer[server.ip].finished)
+          server_str = chalk.bold.green(server.ip);
         else
-          server_str = chalk.bold.blue(server.hostname);
+          server_str = chalk.bold.blue(server.ip);
 
         list.pushItem(server_str);
       });
@@ -126,10 +127,10 @@ var WinMode = {
       screen.render();
     }, 200);
 
-    var current_server = server_list[0].hostname;
+    var current_server = server_list[0].ip;
 
     that.log_emitter.on('log', function(data) {
-      if (data.hostname == current_server) {
+      if (data.ip == current_server) {
         textbox.setItems(that._stream_buffer[current_server].output);
         textbox.scrollTo(that._stream_buffer[current_server].output.length);
       }
@@ -137,25 +138,25 @@ var WinMode = {
 
     screen.render();
   },
-  getLine : function(hostname, str) {
-    return '[' + moment().format('LTS') + '](' + hostname + ') ' + str;
+  getLine : function(ip, str) {
+    return chalk.red('(' + ip + ')[' + moment().format('LTS') + '] ') + str;
   },
-  formatOut : function(hostname, str, error) {
+  formatOut : function(ip, str, error) {
     var out = str.split('\n');
     var that = this;
 
     out.forEach(function(line) {
       if (line.length == 0) return;
-      var l = '[' + moment().format('LTS') + '](' + hostname + ') ';
+      var l = chalk.dim.grey('(' + ip + ')[' + moment().format('LTS') + '] ');
       if (error)
         l += chalk.red(line);
       else
         l += line;
       that.log_emitter.emit('log', {
-        hostname : hostname,
+        ip : ip,
         line : l
       });
-      that._stream_buffer[hostname].output.push(l);
+      that._stream_buffer[ip].output.push(l);
     });
   },
   start : function(cmd, server_list, cb) {
@@ -170,42 +171,46 @@ var WinMode = {
       return cb ? cb() : process.exit(0);
     });
 
-    process.nextTick(function() {
-      that.textbox.addItem(that.getLine(server_list[0].hostname, '$ ' + cmd));
-    });
+    // process.nextTick(function() {
+    //   that.textbox.setItems(['',that.getLine(server_list[0].hostname, '$ ' + cmd)])
+    // });
 
     async.forEachLimit(server_list, 20, function(server, next) {
       if (server.state && server.state != 'running') return next();
 
       var stream = sshexec("PS1='$ ' source ~/.bashrc; " + cmd,  server.user + '@' + server.ip);
 
-      that._stream_buffer[server.hostname] = {
+      that._stream_buffer[server.ip] = {
         output : [],
         error : null,
         finished : false,
         started_at : new Date()
       };
-      that.formatOut(server.hostname, '$ ' + cmd);
+
+      stream.on('ready', function() {
+        that.formatOut(server.ip, 'Connected to ' + server.ip);
+        that.formatOut(server.ip, '$ ' + cmd);
+      });
 
       stream.on('warn', function(dt) {
-        that.formatOut(server.hostname, dt.toString());
+        that.formatOut(server.ip, dt.toString());
       });
 
       stream.on('data', function(dt) {
-        that.formatOut(server.hostname, dt.toString());
+        that.formatOut(server.ip, dt.toString());
       });
 
       stream.on('error', function(e) {
-        that.formatOut(server.hostname, e.message || e, true);
-        that._stream_buffer[server.hostname].error = e;
-        that._stream_buffer[server.hostname].finished = true;
-        that.formatOut(server.hostname, chalk.bold('Command Finished with Error\nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.hostname].started_at.getTime()) / 1000)) + 'secs'));
+        that.formatOut(server.ip, e.message || e, true);
+        that._stream_buffer[server.ip].error = e;
+        that._stream_buffer[server.ip].finished = true;
+        that.formatOut(server.ip, chalk.bold('Command Finished with Error\nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.ip].started_at.getTime()) / 1000)) + 'secs'));
       });
 
       stream.on('finish', function(code) {
-        that._stream_buffer[server.hostname].finished = true;
-        that._stream_buffer[server.hostname].exit_code = code;
-        that.formatOut(server.hostname, chalk.bold(' \n \nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.hostname].started_at.getTime()) / 1000)) + 'secs\nExit code: ') + (code || 0));
+        that._stream_buffer[server.ip].finished = true;
+        that._stream_buffer[server.ip].exit_code = code;
+        that.formatOut(server.ip, chalk.bold(' \n \nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.ip].started_at.getTime()) / 1000)) + 'secs\nExit code: ') + (code || 0));
         next();
       });
     }, function() {

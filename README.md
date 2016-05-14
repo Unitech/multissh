@@ -4,7 +4,9 @@
 Multi screen termcaps UI to execute a command into a list of servers.
 This module will ssh into each host passed in arguments and execute the command.
 
-NB: Make sure you have your SSH key into each host via `ssh-copy-id user@ip`
+[![asciicast](https://asciinema.org/a/4eif8021ez7en488spdxtpmyd.png)](https://asciinema.org/a/4eif8021ez7en488spdxtpmyd)
+
+**NB: Make sure you have your SSH pub key into each host via `$ ssh-copy-id user@ip`**
 
 
 ```javascript
@@ -12,14 +14,16 @@ var multissh = require('multissh');
 
 // Execute command `ls -al` in each host
 multissh.start('ls -al', [{
- ip : ip,
- hostname : hostname,
+ ip   : ip,
  user : user
 }, {
  ip : ip,
- hostname : hostname,
  user : user
 }], function(cb) {
   // Optionnal callback
 });
 ```
+
+# License
+
+MIT
