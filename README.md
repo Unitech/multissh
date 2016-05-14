@@ -15,7 +15,8 @@ var multissh = require('multissh');
 // Execute command `ls -al` in each host
 multissh.start('ls -al', [{
  ip   : ip,
- user : user
+ user : user,
+ local: true // Exec command via exec instead of ssh
 }, {
  ip : ip,
  user : user
@@ -23,7 +24,3 @@ multissh.start('ls -al', [{
   // Optionnal callback
 });
 ```
-
-# License
-
-MIT

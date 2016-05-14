@@ -7,6 +7,7 @@ var moment       = require('moment');
 var chalk        = require('chalk');
 var EventEmitter = require('events');
 var pkg          = require('./package.json');
+var exec = require('child_process').exec;
 
 var WinMode = {
   initUX : function(server_list, cmd) {
@@ -22,6 +23,7 @@ var WinMode = {
       parent: screen,
       height : '100%',
       width: '80%+1',
+      scrollable : true,
       border: 'line',
       label : chalk.bold(' MultiSSH ' + pkg.version) + ': SSH command result ',
       top: 0,
@@ -56,7 +58,6 @@ var WinMode = {
     });
 
     text.setData([
-      ['Command', '$ ' + chalk.bold(cmd) ],
       ['Key up', 'Select prev server'],
       ['Key down', 'Select next server'],
       [ 'Ctrl-c', 'Exit MultiSSH']
@@ -71,6 +72,7 @@ var WinMode = {
       keys: true,
       label : chalk.bold(' Server list '),
       height : '85%',
+      scrollable : false,
       width: '20%',
       border: 'line',
       top: 0,
@@ -168,6 +170,7 @@ var WinMode = {
     this.initUX(server_list, cmd);
 
     this.screen.key(['escape', 'q', 'C-c'], function(ch, key) {
+      that.screen.destroy();
       return cb ? cb() : process.exit(0);
     });
 
@@ -178,14 +181,44 @@ var WinMode = {
     async.forEachLimit(server_list, 20, function(server, next) {
       if (server.state && server.state != 'running') return next();
 
-      var stream = sshexec("PS1='$ ' source ~/.bashrc; " + cmd,  server.user + '@' + server.ip);
-
       that._stream_buffer[server.ip] = {
         output : [],
         error : null,
         finished : false,
         started_at : new Date()
       };
+
+      if (server.local) {
+        that.formatOut(server.ip, 'Connected locally to ' + server.ip);
+        that.formatOut(server.ip, '$ ' + cmd);
+        const child = exec(cmd);
+
+        child.stdout.on('data', function(dt) {
+          that.formatOut(server.ip, dt.toString());
+        });
+
+        child.stderr.on('data', function(dt) {
+          that.formatOut(server.ip, dt.toString());
+        });
+
+        child.on('error', function(e) {
+          that.formatOut(server.ip, e.message || e, true);
+          that._stream_buffer[server.ip].error = e;
+          that._stream_buffer[server.ip].finished = true;
+          that.formatOut(server.ip, chalk.bold('Command Finished with Error\nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.ip].started_at.getTime()) / 1000)) + 'secs'));
+        });
+
+        child.on('close', function(code) {
+          that._stream_buffer[server.ip].finished = true;
+          that._stream_buffer[server.ip].exit_code = code;
+          that.formatOut(server.ip, chalk.bold(' \n \nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.ip].started_at.getTime()) / 1000)) + 'secs\nExit code: ') + (code || 0));
+          next();
+        });
+
+        return false;
+      }
+
+      var stream = sshexec("PS1='$ ' source ~/.bashrc; " + cmd,  server.user + '@' + server.ip);
 
       stream.on('ready', function() {
         that.formatOut(server.ip, 'Connected to ' + server.ip);
