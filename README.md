@@ -16,6 +16,7 @@ var multissh = require('multissh');
 multissh.start('ls -al', [{
  ip   : ip,
  user : user,
+ key  : 'rsa_pub.key', // Optional key
  local: true // Exec command via exec instead of ssh
 }, {
  ip : ip,

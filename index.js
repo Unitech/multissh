@@ -188,7 +188,7 @@ var WinMode = {
         started_at : new Date()
       };
 
-      if (server.local) {
+      function execLocal(cb) {
         that.formatOut(server.ip, 'Connected locally to ' + server.ip);
         that.formatOut(server.ip, '$ ' + cmd);
         const child = exec(cmd);
@@ -212,13 +212,29 @@ var WinMode = {
           that._stream_buffer[server.ip].finished = true;
           that._stream_buffer[server.ip].exit_code = code;
           that.formatOut(server.ip, chalk.bold(' \n \nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.ip].started_at.getTime()) / 1000)) + 'secs\nExit code: ') + (code || 0));
-          next();
+          cb(code);
         });
 
         return false;
       }
 
-      var stream = sshexec("PS1='$ ' source ~/.bashrc; " + cmd,  server.user + '@' + server.ip);
+      if (server.local) {
+        execLocal(function() {
+          next();
+        });
+      }
+
+      var ssh_opts = {
+        host : server.ip,
+        user : server.user
+      };
+
+      if (server.key) {
+        ssh_opts.key = server.key;
+      }
+
+
+      var stream = sshexec("PS1='$ ' source ~/.bashrc; " + cmd, ssh_opts);
 
       stream.on('ready', function() {
         that.formatOut(server.ip, 'Connected to ' + server.ip);
@@ -234,10 +250,15 @@ var WinMode = {
       });
 
       stream.on('error', function(e) {
-        that.formatOut(server.ip, e.message || e, true);
-        that._stream_buffer[server.ip].error = e;
-        that._stream_buffer[server.ip].finished = true;
-        that.formatOut(server.ip, chalk.bold('Command Finished with Error\nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.ip].started_at.getTime()) / 1000)) + 'secs'));
+        if (e) {
+          execLocal(function(sec_e) {
+            if (!sec_e) return false;
+            that.formatOut(server.ip, e.message || e, true);
+            that._stream_buffer[server.ip].error = e;
+            that._stream_buffer[server.ip].finished = true;
+            that.formatOut(server.ip, chalk.bold('Command Finished with Error\nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.ip].started_at.getTime()) / 1000)) + 'secs'));
+          });
+        }
       });
 
       stream.on('finish', function(code) {
