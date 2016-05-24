@@ -234,7 +234,7 @@ var WinMode = {
       }
 
 
-      var stream = sshexec("PS1='$ ' source ~/.bashrc; " + cmd, ssh_opts);
+      var stream = sshexec("PS1='$ ' $HOME'/.'`basename $SHELL`'rc'; " + cmd, ssh_opts);
 
       stream.on('ready', function() {
         that.formatOut(server.ip, 'Connected to ' + server.ip);
