@@ -8,20 +8,23 @@ This module will ssh into each host passed in arguments and execute the command.
 
 **NB: Make sure you have your SSH pub key into each host via `$ ssh-copy-id user@ip`**
 
-
 ```javascript
 var multissh = require('multissh');
 
 // Execute command `ls -al` in each host
-multissh.start('ls -al', [{
- ip   : ip,
- user : user,
- key  : 'rsa_pub.key', // Optional key
- local: true // Exec command via exec instead of ssh
-}, {
- ip : ip,
- user : user
-}], function(cb) {
+multissh.start({
+ cmd : 'ls -al',
+ title : 'Doing a file listing',
+ server_list : [{
+    ip   : ip,
+    user : user,
+    key  : 'rsa_pub.key', // Optional key
+    local: true // Exec command via exec instead of ssh
+  },{
+    ip : ip,
+    user : user
+  }],
+ }, function(cb) {
   // Optionnal callback
 });
 ```

@@ -1,6 +1,6 @@
 {
   "name": "multissh",
-  "version": "1.0.7",
+  "version": "2.0.1",
   "description": "",
   "main": "index.js",
   "scripts": {

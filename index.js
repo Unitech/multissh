@@ -10,8 +10,10 @@ var pkg          = require('./package.json');
 var exec = require('child_process').exec;
 
 var WinMode = {
-  initUX : function(server_list, cmd) {
-    var that = this;
+  initUX : function(opts) {
+    var that        = this;
+    var cmd         = opts.cmd;
+    var server_list = opts.server_list;
 
     var screen = this.screen = blessed.screen({
       smartCSR : true,
@@ -25,7 +27,7 @@ var WinMode = {
       width: '80%+1',
       scrollable : true,
       border: 'line',
-      label : chalk.bold(' MultiSSH ' + pkg.version) + ': SSH command result ',
+      label : opts.title || chalk.bold(' MultiSSH ' + pkg.version) + ': SSH command result ',
       top: 0,
       left: 0,
       padding : 2,
@@ -161,22 +163,32 @@ var WinMode = {
       that._stream_buffer[ip].output.push(l);
     });
   },
-  start : function(cmd, server_list, cb) {
-    this._stream_buffer = {};
-    this.log_emitter = new EventEmitter();
-
+  /**
+   * Start MultiSSH
+   *
+   * @param {Object}   opts
+   * @param {String}   opts.cmd Command to execute
+   * @param {Object[]} opts.server_list List of server
+   * @param {String}   [opts.title="MultiSSH"] Window title
+   * @param {Boolean}  [opts.no_sigint_wait=false] Skip Ctrl-C wait signal
+   *
+   */
+  start : function(opts, cb) {
     var that = this;
 
-    this.initUX(server_list, cmd);
+    var cmd          = opts.cmd;
+    var server_list  = opts.server_list;
+    var window_title = opts.title;
+
+    this._stream_buffer = {};
+    this.log_emitter    = new EventEmitter();
+
+    this.initUX(opts);
 
     this.screen.key(['escape', 'q', 'C-c'], function(ch, key) {
       that.screen.destroy();
       return cb ? cb() : process.exit(0);
     });
-
-    // process.nextTick(function() {
-    //   that.textbox.setItems(['',that.getLine(server_list[0].hostname, '$ ' + cmd)])
-    // });
 
     async.forEachLimit(server_list, 20, function(server, next) {
       if (server.state && server.state != 'running') return next();
@@ -188,7 +200,10 @@ var WinMode = {
         started_at : new Date()
       };
 
-      function execLocal(cb) {
+      /**
+       * Local Execution
+       */
+      if (server.local) {
         that.formatOut(server.ip, 'Connected locally to ' + server.ip);
         that.formatOut(server.ip, '$ ' + cmd);
         const child = exec(cmd);
@@ -212,18 +227,14 @@ var WinMode = {
           that._stream_buffer[server.ip].finished = true;
           that._stream_buffer[server.ip].exit_code = code;
           that.formatOut(server.ip, chalk.bold(' \n \nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.ip].started_at.getTime()) / 1000)) + 'secs\nExit code: ') + (code || 0));
-          cb(code);
+          next();
         });
-
         return false;
       }
 
-      if (server.local) {
-        return execLocal(function() {
-          next();
-        });
-      }
-
+      /**
+       * Remote execution
+       */
       var ssh_opts = {
         host : server.ip,
         user : server.user
@@ -232,7 +243,6 @@ var WinMode = {
       if (server.key) {
         ssh_opts.key = server.key;
       }
-
 
       var stream = sshexec("PS1='$ ' source ~/.bashrc; " + cmd, ssh_opts);
 
@@ -250,15 +260,10 @@ var WinMode = {
       });
 
       stream.on('error', function(e) {
-        if (e) {
-          execLocal(function(sec_e) {
-            if (!sec_e) return false;
-            that.formatOut(server.ip, e.message || e, true);
-            that._stream_buffer[server.ip].error = e;
-            that._stream_buffer[server.ip].finished = true;
-            that.formatOut(server.ip, chalk.bold('Command Finished with Error\nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.ip].started_at.getTime()) / 1000)) + 'secs'));
-          });
-        }
+        that.formatOut(server.ip, e.message || e, true);
+        that._stream_buffer[server.ip].error = e;
+        that._stream_buffer[server.ip].finished = true;
+        that.formatOut(server.ip, chalk.bold('Command Finished with Error\nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.ip].started_at.getTime()) / 1000)) + 'secs'));
       });
 
       stream.on('finish', function(code) {
