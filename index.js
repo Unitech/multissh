@@ -163,6 +163,10 @@ var WinMode = {
       that._stream_buffer[ip].output.push(l);
     });
   },
+  exit : function(cb) {
+    this.screen.destroy();
+    return cb ? cb() : process.exit(0);
+  },
   /**
    * Start MultiSSH
    *
@@ -170,7 +174,7 @@ var WinMode = {
    * @param {String}   opts.cmd Command to execute
    * @param {Object[]} opts.server_list List of server
    * @param {String}   [opts.title="MultiSSH"] Window title
-   * @param {Boolean}  [opts.no_sigint_wait=false] Skip Ctrl-C wait signal
+   * @param {Boolean}  [opts.auto_exit=false] Skip Ctrl-C wait signal
    *
    */
   start : function(opts, cb) {
@@ -186,8 +190,7 @@ var WinMode = {
     this.initUX(opts);
 
     this.screen.key(['escape', 'q', 'C-c'], function(ch, key) {
-      that.screen.destroy();
-      return cb ? cb() : process.exit(0);
+      that.exit(cb);
     });
 
     async.forEachLimit(server_list, 20, function(server, next) {
@@ -273,7 +276,8 @@ var WinMode = {
         next();
       });
     }, function() {
-      //console.log(that._stream_buffer);
+      if (opts.auto_exit === true || process.env.NODE_ENV == 'test')
+        that.exit(cb);
     });
   }
 };
