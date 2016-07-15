@@ -28,3 +28,8 @@ multissh.start({
   // Optionnal callback
 });
 ```
+
+# Misc commands
+
+IP : `hostname -I | cut -d " " -f1`
+Remove interactive checks: "grep "case \$-" .bashrc && sed -i '5,9d' .bashrc"
