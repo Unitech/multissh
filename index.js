@@ -183,6 +183,7 @@ var WinMode = {
     var cmd          = opts.cmd;
     var server_list  = opts.server_list;
     var window_title = opts.title;
+    var global_key   = opts.ssh_key;
 
     this._stream_buffer = {};
     this.log_emitter    = new EventEmitter();
@@ -243,9 +244,11 @@ var WinMode = {
         user : server.user
       };
 
-      if (server.key) {
+      if (global_key)
+        ssh_opts.key = global_key;
+
+      if (server.key)
         ssh_opts.key = server.key;
-      }
 
       var stream = sshexec("PS1='$ ' source ~/.bashrc; " + cmd, ssh_opts);
 
