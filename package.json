@@ -1,6 +1,6 @@
 {
   "name": "multissh",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -13,6 +13,6 @@
     "moment" : "*",
     "async": "*"
   },
-  "author": "",
+  "author": "Alexandre Strzelewicz",
   "license": "ISC"
 }

@@ -225,6 +225,7 @@ var WinMode = {
           that._stream_buffer[server.ip].error = e;
           that._stream_buffer[server.ip].finished = true;
           that.formatOut(server.ip, chalk.bold('Command Finished with Error\nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.ip].started_at.getTime()) / 1000)) + 'secs'));
+          next();
         });
 
         child.on('close', function(code) {
@@ -270,6 +271,7 @@ var WinMode = {
         that._stream_buffer[server.ip].error = e;
         that._stream_buffer[server.ip].finished = true;
         that.formatOut(server.ip, chalk.bold('Command Finished with Error\nDuration: ' + (Math.abs(((new Date()).getTime() - that._stream_buffer[server.ip].started_at.getTime()) / 1000)) + 'secs'));
+        next();
       });
 
       stream.on('finish', function(code) {
