@@ -167,6 +167,67 @@ var WinMode = {
     this.screen.destroy();
     return cb ? cb() : process.exit(0);
   },
+  non_interactive_mode : function(cmd, global_key, server_list, cb) {
+    var that = this;
+
+    async.forEachLimit(server_list, 20, function(server, next) {
+      if (server.state && server.state != 'running') return next();
+
+      if (server.local) {
+        const child = exec(cmd);
+        child.stdout.on('data', function(dt) {
+          console.log(dt);
+        });
+        child.stderr.on('data', function(dt) {
+          console.error(dt);
+        });
+        child.on('error', function(e) {
+          console.error(e.message || e);
+          next();
+        });
+        child.on('close', function(code) {
+          if (code != 0) console.log(code);
+          next()
+        });
+        return false;
+      }
+
+      var ssh_opts = {
+        host : server.ip,
+        user : server.user
+      };
+
+      if (global_key)
+        ssh_opts.key = global_key;
+
+      if (server.key)
+        ssh_opts.key = server.key;
+
+      var stream = sshexec("PS1='$ ' source ~/.bashrc; " + cmd, ssh_opts);
+
+      stream.on('ready', function() {});
+
+      stream.on('warn', function(dt) {
+        console.log(dt.toString());
+      });
+
+      stream.on('data', function(dt) {
+        console.log(dt.toString());
+      });
+
+      stream.on('error', function(e) {
+        console.error(e.message || e);
+        next();
+      });
+
+      stream.on('finish', function(code) {
+        if (code != 0) console.log(code);
+        next();
+      });
+    }, function() {
+      cb ? cb() : process.exit(0);
+    });
+  },
   /**
    * Start MultiSSH
    *
@@ -184,6 +245,14 @@ var WinMode = {
     var server_list  = opts.server_list;
     var window_title = opts.title;
     var global_key   = opts.ssh_key;
+
+    if (opts.non_interactive_mode ||
+        process.env.NON_INTERACTIVE_MODE ||
+        !process.stdout.isTTY) {
+
+      this.non_interactive_mode(cmd, global_key, server_list, cb);
+      return false;
+    }
 
     this._stream_buffer = {};
     this.log_emitter    = new EventEmitter();
